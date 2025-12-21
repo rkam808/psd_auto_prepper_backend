@@ -11,6 +11,17 @@ gem "pg", "~> 1.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
+# To talk to your Python Microservice
+gem "faraday"
+
+# To handle Cross-Origin requests from your React Frontend
+gem "rack-cors"
+
+# (Optional) If you want to use RSpec
+group :development, :test do
+  gem "rspec-rails"
+end
+
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 # gem "jbuilder"
 
@@ -44,4 +55,3 @@ group :development do
   # Speed up commands on slow machines / big apps [https://github.com/rails/spring]
   # gem "spring"
 end
-
