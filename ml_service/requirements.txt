@@ -5,3 +5,4 @@ numpy
 opencv-python
 rembg
 pytoshop
+six
