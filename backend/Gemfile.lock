@@ -102,6 +102,8 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
+    faraday-multipart (1.1.1)
+      multipart-post (~> 2.0)
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
     globalid (1.3.0)
@@ -129,6 +131,7 @@ GEM
     minitest (6.0.0)
       prism (~> 1.5)
     msgpack (1.8.0)
+    multipart-post (2.4.1)
     mutex_m (0.3.0)
     net-http (0.9.1)
       uri (>= 0.11.1)
@@ -271,6 +274,7 @@ DEPENDENCIES
   bootsnap
   debug
   faraday
+  faraday-multipart
   pg (~> 1.1)
   puma (>= 5.0)
   rack-cors

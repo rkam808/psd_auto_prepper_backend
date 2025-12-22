@@ -13,6 +13,7 @@ gem "puma", ">= 5.0"
 
 # To talk to your Python Microservice
 gem "faraday"
+gem "faraday-multipart"
 
 # To handle Cross-Origin requests from your React Frontend
 gem "rack-cors"

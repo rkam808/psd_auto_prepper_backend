@@ -23,6 +23,9 @@ module PsdAutoPrepperBackend
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 7.1
 
+    # Add app/services to the autoload paths
+    config.autoload_paths << Rails.root.join("app", "services")
+
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.

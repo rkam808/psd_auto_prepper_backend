@@ -4,7 +4,14 @@ class ProcessingJobsController < ApplicationController
 
   def create
     job = ProcessingJob.create(status: :pending)
-    job.original_image.attach(params[:image])
+
+    if params[:processing_job] && params[:processing_job][:original_image]
+      job.original_image.attach(params[:processing_job][:original_image])
+    end
+
+    ::PsdGeneratorService.new(job.id).call
+
+    job.reload
 
     render json: { id: job.id, status: job.status }
   end
@@ -16,7 +23,7 @@ class ProcessingJobsController < ApplicationController
       render json: {
         id: job.id,
         status: job.status,
-        prepped_psd_url: url_for(job.prepped_psd)
+        prepped_psd_url: rails_blob_url(job.prepped_psd)
       }
     else
       render json: { id: job.id, status: job.status }
