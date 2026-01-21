@@ -23,6 +23,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    depends_on:
+      - backend
+      - ml_service
 
   ml_service:
     build: ./ml_service

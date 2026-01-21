@@ -2,3 +2,4 @@
 node_modules/
 __pycache__/
 ml_service/venv/
+.env

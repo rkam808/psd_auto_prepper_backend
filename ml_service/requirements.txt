@@ -3,7 +3,7 @@ uvicorn
 python-multipart
 numpy
 opencv-python
-rembg
+rembg[cpu]
 pytoshop
 six
 packbits
