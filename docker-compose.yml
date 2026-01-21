@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://psd_auto_prepper_backend:password@db:5432/psd_auto_prepper_backend_production
+      - PSD_AUTO_PREPPER_BACKEND_DATABASE_PASSWORD=password
+      - RAILS_MASTER_KEY=${RAILS_MASTER_KEY}
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/rails
+      # Keep local and container gems in sync
+      - bundle_cache:/usr/local/bundle
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  ml_service:
+    build: ./ml_service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml_service:/app
+      - /app/venv
+      - /app/__pycache__
+
+  db:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=psd_auto_prepper_backend
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=psd_auto_prepper_backend_production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  bundle_cache:

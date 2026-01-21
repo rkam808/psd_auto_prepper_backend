@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = '/api';
 
 function App() {
   const [file, setFile] = useState(null);
