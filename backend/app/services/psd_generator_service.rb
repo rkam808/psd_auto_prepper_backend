@@ -2,7 +2,7 @@ require 'faraday'
 require 'faraday/multipart'
 
 class PsdGeneratorService
-  PYTHON_SERVICE_URL = 'http://127.0.0.1:8000/process-model'
+  PYTHON_SERVICE_URL = 'http://ml_service:8000/process-model'
 
   def initialize(job_id)
     @job_id = job_id

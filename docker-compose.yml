@@ -13,8 +13,6 @@ services:
       - db
     volumes:
       - ./backend:/rails
-      # Keep local and container gems in sync
-      - bundle_cache:/usr/local/bundle
 
   frontend:
     build: ./frontend

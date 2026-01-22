@@ -46,7 +46,7 @@ function App() {
       setStatus('failed');
     }
   };
-  
+
   // Effect for triggering upload when file is selected
   useEffect(() => {
     if (file) {
@@ -101,9 +101,8 @@ function App() {
         if (!downloadUrl) {
           return <p className="error-message">Could not get download URL.</p>;
         }
-        const finalUrl = new URL(downloadUrl, API_BASE_URL).href;
         return (
-          <a href={finalUrl} className="download-button" download>
+          <a href={downloadUrl} className="download-button" download>
             Download PSD
           </a>
         );
