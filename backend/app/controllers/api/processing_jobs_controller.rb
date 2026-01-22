@@ -1,4 +1,4 @@
-class ProcessingJobsController < ApplicationController
+class Api::ProcessingJobsController < ApplicationController
   # For disabling CSRF tokens on API controllers.
   # protect_from_forgery with: :null_session
 
@@ -23,7 +23,7 @@ class ProcessingJobsController < ApplicationController
       render json: {
         id: job.id,
         status: job.status,
-        prepped_psd_url: rails_blob_url(job.prepped_psd)
+        prepped_psd_url: rails_blob_path(job.prepped_psd)
       }
     else
       render json: { id: job.id, status: job.status }
