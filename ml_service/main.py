@@ -293,29 +293,19 @@ def extract_features(head_layer: Image.Image, face: FaceData):
     return bald_head, (eye_l_layer, le_box), (eye_r_layer, re_box), (mouth_layer, m_box), hair_layer, skin_color, shadow_color, face_width
 
 def scan_neck_geometry(body_img: Image.Image, split_y: int, skin_color: tuple, shadow_color: tuple, threshold=40):
-    """
-    Scans the top of the body layer to find where the skin/shadow pixels start and end.
-    Returns (neck_center, neck_width).
-    """
-    # Crop a small strip (10px height) just below the cut line
-    # We go down +5px to avoid anti-aliasing artifacts at the exact cut line
     scan_y = split_y + 5
     scan_h = 10
 
     if scan_y + scan_h > body_img.height:
-        # Image too short? fallback.
         return None, None
 
     strip = body_img.crop((0, scan_y, body_img.width, scan_y + scan_h))
     arr = np.array(strip)
 
-    # Extract channels
     r, g, b, a = arr[:,:,0], arr[:,:,1], arr[:,:,2], arr[:,:,3]
 
-    # Helper to calculate mask for a color target
     def get_mask(target):
         tr, tg, tb = target[:3]
-        # Euclidean distance
         dist = np.sqrt(
             (r.astype(int) - tr)**2 +
             (g.astype(int) - tg)**2 +
@@ -323,24 +313,16 @@ def scan_neck_geometry(body_img: Image.Image, split_y: int, skin_color: tuple, s
         )
         return (dist < threshold) & (a > 0)
 
-    # Create masks for Base Skin AND Shadow Skin
     mask_skin = get_mask(skin_color)
     mask_shadow = get_mask(shadow_color)
 
-    # Combine: valid pixel is either skin OR shadow
     final_mask = mask_skin | mask_shadow
-
-    # Find all X coordinates that are True
-    # We sum vertically (axis 0) to check if ANY pixel in the column matched
     col_hits = np.any(final_mask, axis=0)
-
-    # Get indices of True columns
     valid_indices = np.where(col_hits)[0]
 
     if len(valid_indices) == 0:
-        return None, None # No skin found (Turtleneck?)
+        return None, None
 
-    # Get Bounds
     x_min = valid_indices[0]
     x_max = valid_indices[-1]
 
@@ -354,7 +336,7 @@ def generate_neck_extension(
     body_img: Image.Image,
     split_y: int,
     neck_color: tuple,
-    skin_color_ref: tuple, # Needed for scanning
+    skin_color_ref: tuple,
     face_width: int,
     width_ratio: float = 0.65,
     extension_ratio: float = 0.5
@@ -363,15 +345,12 @@ def generate_neck_extension(
     width = body_img.width
     height = body_img.height
 
-    # 1. Try to SCAN for exact neck position
     scan_center, scan_width = scan_neck_geometry(body_img, split_y, skin_color_ref, neck_color)
 
     if scan_center is not None and scan_width > 20:
-        # Scan successful! Use measured data.
-        neck_w = int(scan_width * 0.95) # Shrink slightly to fit INSIDE the lines
+        neck_w = int(scan_width * 0.95)
         center_x = scan_center
     else:
-        # Fallback to ratio math (Turtleneck or failed scan)
         print("LOG: Neck Scan Failed (No skin found). Using Ratio Fallback.")
         neck_w = int(face_width * width_ratio)
         center_x = width // 2
@@ -396,6 +375,57 @@ def generate_neck_extension(
 
     return final_body
 
+# --- NEW FUNCTION: SPLIT TORSO AND ARMS ---
+def split_body_parts(body_img: Image.Image, split_y: int, face_width: int, torso_ratio: float = 1.8):
+    """
+    Slices the body into Torso (Center) and Arms (Sides).
+    Inpaints the sides of the Torso to create a 'rounded' backing for the arms.
+    """
+    w, h = body_img.size
+    center_x = w // 2
+
+    # Calculate Torso Width based on Face Width
+    # 1.8x is typical for male/unisex shoulders
+    torso_w = int(face_width * torso_ratio)
+    half_torso = torso_w // 2
+
+    # Define Cut Lines
+    # Viewer Left (Character Right) is 0 to x1
+    x1 = center_x - half_torso
+    # Viewer Right (Character Left) is x2 to width
+    x2 = center_x + half_torso
+
+    # 1. Extract Arms
+    # Viewer Left Arm (Character R)
+    arm_r_img = body_img.crop((0, split_y, x1, h))
+
+    # Viewer Right Arm (Character L)
+    arm_l_img = body_img.crop((x2, split_y, w, h))
+
+    # 2. Extract Torso Core
+    torso_core = body_img.crop((x1, split_y, x2, h))
+
+    # 3. Create "Rounded" Torso Backing (Horizontal Inpainting)
+    # We extend the torso edges outwards so they sit behind the arms.
+    torso_full = Image.new("RGBA", (w, h - split_y), (0,0,0,0))
+
+    # Paste the core in the center
+    paste_x = x1
+    torso_full.paste(torso_core, (paste_x, 0))
+
+    # Synthesize Left Extension (Stretch left-most pixel column of torso)
+    left_strip = torso_core.crop((0, 0, 1, h - split_y))
+    left_stretch = left_strip.resize((x1, h - split_y), Image.Resampling.NEAREST)
+    torso_full.paste(left_stretch, (0, 0))
+
+    # Synthesize Right Extension (Stretch right-most pixel column)
+    right_strip = torso_core.crop((torso_core.width - 1, 0, torso_core.width, h - split_y))
+    right_fill_w = w - x2
+    right_stretch = right_strip.resize((right_fill_w, h - split_y), Image.Resampling.NEAREST)
+    torso_full.paste(right_stretch, (x2, 0))
+
+    return torso_full, arm_l_img, arm_r_img, (x1, split_y), (x2, split_y)
+
 def pack_layer(name: str, pil_image: Image.Image, x: int, y: int):
     w, h = pil_image.size
     if w == 0 or h == 0: return None
@@ -414,6 +444,7 @@ async def process_model(
     inpaint_neck: bool = Query(True),
     neck_ratio: float = Query(0.5),
     neck_width_scale: float = Query(0.65),
+    torso_ratio: float = Query(1.8), # New Param for Shoulder Width
     separate_features: bool = Query(True)
 ):
     print(f"\n--- PROCESSING (Advanced AI: {ADVANCED_AI}) ---")
@@ -469,25 +500,60 @@ async def process_model(
         if head_bbox:
             all_layers.append(pack_layer("Head", head_full.crop(head_bbox), head_bbox[0], head_bbox[1]))
 
-    # 4. Body with SCANNED NECK
+    # 4. Body Generation
     body_full = character_only.copy()
     transparent_top = Image.new("RGBA", (width, split_y), (0, 0, 0, 0))
     body_full.paste(transparent_top, (0, 0))
 
+    # A. Generate Neck & Base Body
     if inpaint_neck:
         body_full = generate_neck_extension(
             body_full,
             split_y,
             neck_color=global_shadow_color,
-            skin_color_ref=global_skin_color, # Pass Scan Ref
+            skin_color_ref=global_skin_color,
             face_width=global_face_width,
             width_ratio=neck_width_scale,
             extension_ratio=neck_ratio
         )
 
-    body_bbox = body_full.getbbox()
-    if body_bbox:
-        all_layers.insert(0, pack_layer("Body", body_full.crop(body_bbox), body_bbox[0], body_bbox[1]))
+    # B. Split Torso & Arms
+    if separate_features:
+        torso_img, arm_l_img, arm_r_img, _, arm_l_coords = split_body_parts(
+            body_full, split_y, global_face_width, torso_ratio
+        )
+
+        # Pack Torso (Behind)
+        t_bbox = torso_img.getbbox()
+        if t_bbox:
+            all_layers.insert(0, pack_layer("Torso", torso_img.crop(t_bbox), t_bbox[0], t_bbox[1] + split_y))
+
+        # Pack Arms (Front)
+        # Note: arm_r is viewer left (0,0), arm_l is viewer right
+        ar_bbox = arm_r_img.getbbox()
+        if ar_bbox:
+            all_layers.insert(0, pack_layer("Arm_R", arm_r_img.crop(ar_bbox), ar_bbox[0], ar_bbox[1] + split_y))
+
+        al_bbox = arm_l_img.getbbox()
+        if al_bbox:
+            # arm_l crop coords are local to the crop, need global offset
+            # Wait, split_body_parts returns images with correct relative dimensions
+            # arm_l_img comes from (x2, split_y).
+            # pack_layer expects coords on the global canvas?
+            # actually, my helper function split_body_parts returns PIL images cropped to their content?
+            # No, it returns cropped strips.
+
+            # Let's verify coordinates logic.
+            # arm_l_img was cropped from (x2, split_y).
+            # So its (0,0) is actually (x2, split_y).
+            # pack_layer handles placement.
+            all_layers.insert(0, pack_layer("Arm_L", arm_l_img.crop(al_bbox), al_bbox[0] + arm_l_coords[0], al_bbox[1] + split_y))
+
+    else:
+        # Fallback simple body
+        body_bbox = body_full.getbbox()
+        if body_bbox:
+            all_layers.insert(0, pack_layer("Body", body_full.crop(body_bbox), body_bbox[0], body_bbox[1]))
 
     # 6. Save
     psd_file = nested_layers.nested_layers_to_psd(
